@@ -1,0 +1,36 @@
+name: Update
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - name: Find latest upstream submit client commit
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rev=$(gh api "repos/$(jq -r '"\(.owner)/\(.repo)"' source.json)/commits?sha=main&path=submit&per_page=1" --jq '.[0].sha // empty')
+          test -n "$rev"
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+          echo "short=${rev:0:12}" >> "$GITHUB_OUTPUT"
+      - name: Pin commit
+        run: nix develop --command ./update.sh "${{ steps.upstream.outputs.rev }}"
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.UPDATE_TOKEN || github.token }}
+          branch: update/domjudge
+          commit-message: "Update domjudge submit to ${{ steps.upstream.outputs.short }}"
+          title: "Update domjudge submit to ${{ steps.upstream.outputs.short }}"
+          body: |
+            Upstream commit: https://github.com/domjudge/domjudge/commit/${{ steps.upstream.outputs.rev }}
