@@ -22,7 +22,6 @@
       devShells.x86_64-linux.default = pkgs.mkShell {
         packages = with pkgs; [
           jq
-          nix-prefetch-github
         ];
       };
     };
